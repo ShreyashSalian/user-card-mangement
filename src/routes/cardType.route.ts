@@ -22,6 +22,8 @@ cardTypeRouter.post(
   addCardType
 );
 
+cardTypeRouter.post("/search", verifyUser, checkAdmin, listAllCardType);
+
 cardTypeRouter.get("/:cardTypeId", verifyUser, checkAdmin, getCardTypeById);
 
 cardTypeRouter.put(
@@ -34,7 +36,5 @@ cardTypeRouter.put(
 );
 
 cardTypeRouter.post("/:cardTypeId", verifyUser, checkAdmin, softDeleteCardType);
-
-cardTypeRouter.post("/search", verifyUser, checkAdmin, listAllCardType);
 
 export default cardTypeRouter;

@@ -20,6 +20,7 @@ cardProviderRouter.post(
   validateAPI,
   addCardProvider
 );
+cardProviderRouter.post("/search", verifyUser, checkAdmin, listAllCardProvider);
 cardProviderRouter.get(
   "/:cardProviderId",
   verifyUser,
@@ -30,6 +31,8 @@ cardProviderRouter.put(
   "/:cardProviderId",
   verifyUser,
   checkAdmin,
+  CardProviderValidation(),
+  validateAPI,
   updateCardProvider
 );
 
@@ -39,6 +42,5 @@ cardProviderRouter.post(
   checkAdmin,
   softDeleteCardProvider
 );
-cardProviderRouter.post("/search", verifyUser, checkAdmin, listAllCardProvider);
 
 export default cardProviderRouter;

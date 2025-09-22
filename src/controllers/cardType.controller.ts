@@ -7,11 +7,11 @@ import { SearchBody } from "../helpers/User.helper";
 
 export const addCardType = asyncHandler(
   async (
-    req: express.Request<{}, {}, { name: string }>,
+    req: express.Request<{}, {}, { name: string; cardType: string }>,
     res: express.Response
   ): Promise<express.Response> => {
     try {
-      const name = req.body.name;
+      const { name, cardType } = req.body;
       const cardAlreadyExist = await CardType.findOne({ name });
       if (cardAlreadyExist) {
         return sendError(
@@ -23,6 +23,7 @@ export const addCardType = asyncHandler(
       }
       const cardTypeCreation = await CardType.create({
         name,
+        cardType,
       });
       if (cardTypeCreation) {
         return sendSuccess(
@@ -105,12 +106,16 @@ export const softDeleteCardType = asyncHandler(
 
 export const updateCardType = asyncHandler(
   async (
-    req: express.Request<{ cardTypeId: string }, {}, { name: string }>,
+    req: express.Request<
+      { cardTypeId: string },
+      {},
+      { name: string; cardType: string }
+    >,
     res: express.Response
   ): Promise<express.Response> => {
     try {
       const cardTypeId = req.params.cardTypeId;
-      const name = req.body.name;
+      const { name, cardType } = req.body;
       const existingCardType = await CardType.findOne({
         name: name,
         _id: { $ne: cardTypeId }, // exclude current ID
@@ -123,11 +128,18 @@ export const updateCardType = asyncHandler(
           "The name already existed for the card"
         );
       }
-      const updateCardType = await CardType.findByIdAndUpdate(cardTypeId, {
-        $set: {
-          name,
+      const updateCardType = await CardType.findByIdAndUpdate(
+        cardTypeId,
+        {
+          $set: {
+            name,
+            cardType,
+          },
         },
-      });
+        {
+          new: true,
+        }
+      );
       if (updateCardType) {
         return sendSuccess(
           res,
@@ -167,56 +179,58 @@ export const listAllCardType = asyncHandler(
       const sortBy = req.body.sortBy || "createdAt";
       const sortOrder = req.body.sortOrder === "asc" ? 1 : -1;
       const search = req.body.search;
+      console.log(search);
 
+      // Search filter
       const searchFilter = search
         ? {
-            name: { regex: search, $options: "i" },
+            $or: [
+              { name: { $regex: search, $options: "i" } },
+              { cardType: { $regex: search, $options: "i" } },
+            ],
           }
         : {};
+
       const matchStage = {
         ...searchFilter,
         isDeleted: false,
       };
+
+      // Get paginated results
       const cardTypeDetail = await CardType.aggregate([
-        {
-          $match: matchStage,
-        },
-        {
-          $sort: {
-            [sortBy]: sortOrder,
-          },
-        },
-        {
-          $limit: limit,
-        },
-        {
-          $skip: skip,
-        },
+        { $match: matchStage },
+        { $sort: { [sortBy]: sortOrder } },
+        { $skip: skip },
+        { $limit: limit },
       ]);
+
+      // Get total count
       const totalCardType = await CardType.countDocuments(matchStage);
+
       if (cardTypeDetail.length === 0) {
         return sendError(
           res,
           CONSTANT_LIST.STATUS_ERROR,
-          CONSTANT_LIST.BAD_REQUEST,
+          CONSTANT_LIST.NO_DATA_FOUND,
           "No card type found"
         );
-      } else {
-        const responsePayload = {
-          totalCardType,
-          page,
-          limit,
-          total: totalCardType,
-          totalPage: Math.ceil(totalCardType / limit),
-        };
-        return sendSuccess(
-          res,
-          CONSTANT_LIST.STATUS_SUCCESS,
-          CONSTANT_LIST.STATUS_CODE_OK,
-          "Card type detail",
-          responsePayload
-        );
       }
+
+      const responsePayload = {
+        cardTypeDetail,
+        total: totalCardType,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCardType / limit),
+      };
+
+      return sendSuccess(
+        res,
+        CONSTANT_LIST.STATUS_SUCCESS,
+        CONSTANT_LIST.STATUS_CODE_OK,
+        "Card type detail",
+        responsePayload
+      );
     } catch (err: any) {
       console.log(err);
       return sendError(
@@ -228,6 +242,7 @@ export const listAllCardType = asyncHandler(
     }
   }
 );
+
 export const getCardTypeById = asyncHandler(
   async (
     req: express.Request<{ cardTypeId: string }, {}, {}>,

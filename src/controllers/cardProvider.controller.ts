@@ -51,12 +51,12 @@ export const addCardProvider = asyncHandler(
 
 export const softDeleteCardProvider = asyncHandler(
   async (
-    req: express.Request<{ cardTypeId: string }, {}, {}>,
+    req: express.Request<{ cardProviderId: string }, {}, {}>,
     res: express.Response
   ): Promise<express.Response> => {
     try {
-      const cardTypeId = req.params.cardTypeId;
-      const cardProviderDetail = await CardProvider.findById(cardTypeId);
+      const cardProviderId = req.params.cardProviderId;
+      const cardProviderDetail = await CardProvider.findById(cardProviderId);
       if (!cardProviderDetail) {
         return sendError(
           res,
@@ -66,7 +66,7 @@ export const softDeleteCardProvider = asyncHandler(
         );
       }
       const softtDeleteCardTypeById = await CardProvider.findByIdAndUpdate(
-        cardTypeId,
+        cardProviderId,
         {
           $set: {
             isDeleted: true,
@@ -102,15 +102,15 @@ export const softDeleteCardProvider = asyncHandler(
 );
 export const updateCardProvider = asyncHandler(
   async (
-    req: express.Request<{ cardTypeId: string }, {}, { name: string }>,
+    req: express.Request<{ cardProviderId: string }, {}, { name: string }>,
     res: express.Response
   ): Promise<express.Response> => {
     try {
-      const cardTypeId = req.params.cardTypeId;
+      const cardProviderId = req.params.cardProviderId;
       const name = req.body.name;
       const existingCardProvider = await CardProvider.findOne({
         name: name,
-        _id: { $ne: cardTypeId }, // exclude current ID
+        _id: { $ne: cardProviderId }, // exclude current ID
       });
       if (existingCardProvider) {
         return sendError(
@@ -120,18 +120,18 @@ export const updateCardProvider = asyncHandler(
           "The name already existed for the card provider"
         );
       }
-      const updateCardType = await CardProvider.findByIdAndUpdate(cardTypeId, {
-        $set: {
-          name,
-        },
-      });
-      if (updateCardType) {
+      const updatedCardProvider = await CardProvider.findByIdAndUpdate(
+        cardProviderId,
+        { $set: { name } },
+        { new: true }
+      );
+      if (updatedCardProvider) {
         return sendSuccess(
           res,
           CONSTANT_LIST.STATUS_SUCCESS,
           CONSTANT_LIST.STATUS_CODE_OK,
           "The card provider name has been updated",
-          updateCardType
+          updatedCardProvider
         );
       } else {
         return sendError(
@@ -167,7 +167,7 @@ export const listAllCardProvider = asyncHandler(
 
       const searchFilter = search
         ? {
-            name: { regex: search, $options: "i" },
+            name: { $regex: search, $options: "i" },
           }
         : {};
       const matchStage = {
@@ -195,12 +195,12 @@ export const listAllCardProvider = asyncHandler(
         return sendError(
           res,
           CONSTANT_LIST.STATUS_ERROR,
-          CONSTANT_LIST.BAD_REQUEST,
+          CONSTANT_LIST.NO_DATA_FOUND,
           "No card provider found"
         );
       } else {
         const responsePayload = {
-          totalCardType,
+          cardTypeDetail,
           page,
           limit,
           total: totalCardType,

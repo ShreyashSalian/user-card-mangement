@@ -8,7 +8,15 @@ export interface CardDocument extends Document {
   cardNumber: string;
   isDeleted: boolean;
   createdAt: Date;
+  cardStatus: string;
   updatedAt: Date;
+}
+
+enum CARD_STATUS {
+  INPROGESS = "inprogress",
+  COMPELTED = "completed",
+  PENDING = "pending",
+  MISSSED = "missed",
 }
 
 const cardSchema = new Schema<CardDocument>(
@@ -34,6 +42,11 @@ const cardSchema = new Schema<CardDocument>(
     isDeleted: {
       type: Boolean,
       default: false,
+    },
+    cardStatus: {
+      type: String,
+      enum: Object.values(CARD_STATUS),
+      default: CARD_STATUS.PENDING,
     },
   },
   {

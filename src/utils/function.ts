@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";
 export function asyncHandler<
   P = {},
   ResBody = any,
@@ -22,13 +23,13 @@ export const sendSuccess = (
   res: express.Response,
   status: number,
   statusCode: number,
-  successMesssage: string,
+  successMessage: string,
   data: any
 ) => {
-  return res.send(statusCode).json({
+  return res.status(statusCode).json({
     status,
     statusCode,
-    successMesssage,
+    successMessage,
     errorMessage: null,
     data,
   });
@@ -40,7 +41,7 @@ export const sendError = (
   statusCode: number,
   errorMessage: string
 ) => {
-  return res.status(res.statusCode).json({
+  return res.status(statusCode).json({
     status,
     statusCode,
     successMessage: null,
@@ -58,5 +59,24 @@ export const trimInput = (value: string) => {
 
 export const capitalizeFirstLetter = (name: string) => {
   if (!name) return "";
-  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase().trim();
+};
+
+// Node.js: secure random digits using crypto.randomBytes
+
+export const secureRandomDigits = (length = 16) => {
+  if (length <= 0) return "";
+  // generate bytes and map each byte -> digit by taking byte % 10
+  const bytes = crypto.randomBytes(length);
+  const digits = [];
+  for (let i = 0; i < length; i++) {
+    // ensure first digit isn't 0 if you want non-leading-zero numbers:
+    if (i === 0) {
+      // map to 1-9
+      digits.push(String((bytes[i] % 9) + 1));
+    } else {
+      digits.push(String(bytes[i] % 10));
+    }
+  }
+  return digits.join("");
 };
