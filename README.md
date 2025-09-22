@@ -1,21 +1,21 @@
-# User Authentication System
+# User Card Management System
 
-A Node.js and MongoDB based REST API for managing users and their cards.
-The system allows:
+- A Node.js and MongoDB based REST API for managing users and their cards.
+  The system allows:
 
-Users to create cards by selecting a Card Type (virtual/physical) and Card Provider (e.g., Visa, MasterCard).
+- Users to create cards by selecting a Card Type (virtual/physical) and Card Provider (e.g., Visa, MasterCard).
 
-Enforces business rules:
+- Enforces business rules:
 
-A user cannot have more than 3 virtual cards.
+- A user cannot have more than 3 virtual cards.
 
-A user cannot have more than 4 physical cards.
+- A user cannot have more than 4 physical cards.
 
-Provides APIs to create, list, and delete cards.
+- Provides APIs to create, list, and delete cards.
 
-Includes webhook support to notify external services when a new card is created.
+- Includes webhook support to notify external services when a new card is created.
 
-API documentation can be generated using Swagger (OpenAPI) for easy testing and integration.
+- API documentation can be generated using Swagger (OpenAPI) for easy testing and integration.
 
 ---
 
