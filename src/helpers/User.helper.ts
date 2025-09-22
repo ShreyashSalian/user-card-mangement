@@ -11,3 +11,11 @@ export interface userBody {
   contactNumber: string;
   userName: string;
 }
+
+export interface SearchBody {
+  page: number;
+  limit: number;
+  sortBy: string;
+  sortOrder: string;
+  search: string;
+}

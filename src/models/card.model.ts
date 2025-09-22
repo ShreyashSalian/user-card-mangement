@@ -6,6 +6,7 @@ export interface CardDocument extends Document {
   cardTypeId: Types.ObjectId;
   cardProviderId: Types.ObjectId;
   cardNumber: string;
+  isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +27,13 @@ const cardSchema = new Schema<CardDocument>(
       type: mongoose.Schema.Types.ObjectId,
       ref: "CardProvider",
       required: true,
+    },
+    cardNumber: {
+      type: String,
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
     },
   },
   {

@@ -23,63 +23,75 @@ export const loginUser = asyncHandler(
     req: express.Request<{}, {}, LoginBody>,
     res: express.Response
   ): Promise<express.Response> => {
-    const { userNameOrEmail, password } = req.body;
-    const userDetail = await User.findOne({
-      $or: [
-        {
-          userName: userNameOrEmail,
-        },
-        {
-          email: { $regex: userNameOrEmail, $options: "i" },
-        },
-      ],
-    });
-    if (!userDetail) {
-      return sendError(
-        res,
-        CONSTANT_LIST.STATUS_ERROR,
-        CONSTANT_LIST.BAD_REQUEST,
-        "Sorry no user found with the given userName or email"
+    try {
+      const { userNameOrEmail, password } = req.body;
+      const userDetail = await User.findOne({
+        $or: [
+          {
+            userName: userNameOrEmail,
+          },
+          {
+            email: { $regex: userNameOrEmail, $options: "i" },
+          },
+        ],
+      });
+      if (!userDetail) {
+        return sendError(
+          res,
+          CONSTANT_LIST.STATUS_ERROR,
+          CONSTANT_LIST.BAD_REQUEST,
+          "Sorry no user found with the given userName or email"
+        );
+      }
+      if (userDetail.isDeleted) {
+        return sendError(
+          res,
+          CONSTANT_LIST.STATUS_ERROR,
+          CONSTANT_LIST.BAD_REQUEST,
+          "Sorrym your account has been disabled by admin"
+        );
+      }
+      const passwordCheck = await userDetail.comparePassword(password);
+      if (!passwordCheck) {
+        return sendError(
+          res,
+          CONSTANT_LIST.STATUS_ERROR,
+          CONSTANT_LIST.BAD_REQUEST,
+          "Please enter the valid password."
+        );
+      }
+      const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
+        userDetail?._id
       );
-    }
-    if (userDetail.isDeleted) {
-      return sendError(
-        res,
-        CONSTANT_LIST.STATUS_ERROR,
-        CONSTANT_LIST.BAD_REQUEST,
-        "Sorrym your account has been disabled by admin"
-      );
-    }
-    const passwordCheck = await userDetail.comparePassword(password);
-    if (!passwordCheck) {
-      return sendError(
-        res,
-        CONSTANT_LIST.STATUS_ERROR,
-        CONSTANT_LIST.BAD_REQUEST,
-        "Please enter the valid password."
-      );
-    }
-    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(
-      userDetail?._id
-    );
-    await Login.create({
-      userId: userDetail?._id,
-      email: userDetail?.email,
-      accessToken,
-      refreshToken,
-    });
-    const loginUser = await User.findById(userDetail?._id).select("-password");
-    return sendSuccess(
-      res,
-      CONSTANT_LIST.STATUS_SUCCESS,
-      CONSTANT_LIST.STATUS_CODE_OK,
-      "Login user detail",
-      {
-        loginUser,
+      await Login.create({
+        userId: userDetail?._id,
+        email: userDetail?.email,
         accessToken,
         refreshToken,
-      }
-    );
+      });
+      const loginUser = await User.findById(userDetail?._id).select(
+        "-password"
+      );
+      return sendSuccess(
+        res,
+        CONSTANT_LIST.STATUS_SUCCESS,
+        CONSTANT_LIST.STATUS_CODE_OK,
+        "Login user detail",
+        {
+          loginUser,
+          accessToken,
+          refreshToken,
+        }
+      );
+    } catch (err: any) {
+      console.log(err);
+      return sendError(
+        res,
+        CONSTANT_LIST.STATUS_ERROR,
+        CONSTANT_LIST.INTERNAL_SERVER_ERROR,
+        CONSTANT_LIST.INTERNAL_SERVER_ERROR_MESSAGE
+      );
+    }
   }
 );
 
