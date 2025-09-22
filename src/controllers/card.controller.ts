@@ -32,11 +32,12 @@ export const addCard = asyncHandler(
       }
 
       const cardType = await CardType.findById(cardTypeId);
+      console.log(cardType);
       if (!cardType) {
         return sendError(
           res,
           CONSTANT_LIST.STATUS_ERROR,
-          CONSTANT_LIST.BAD_REQUEST,
+          CONSTANT_LIST.NO_DATA_FOUND,
           "Card type not found"
         );
       }
@@ -45,7 +46,7 @@ export const addCard = asyncHandler(
         return sendError(
           res,
           CONSTANT_LIST.STATUS_ERROR,
-          CONSTANT_LIST.BAD_REQUEST,
+          CONSTANT_LIST.NO_DATA_FOUND,
           "Card provider not found"
         );
       }
@@ -55,7 +56,7 @@ export const addCard = asyncHandler(
         cardTypeId: cardTypeId,
       });
 
-      if (cardType.cardType === "virtual" && existingCard >= 3) {
+      if (cardType.cardType === "Virtual" && existingCard >= 3) {
         return sendError(
           res,
           CONSTANT_LIST.STATUS_ERROR,
@@ -63,7 +64,7 @@ export const addCard = asyncHandler(
           "User can not jave more than 3 virtual card."
         );
       }
-      if (cardType.cardType === "physical" && existingCard >= 4) {
+      if (cardType.cardType === "Physical" && existingCard >= 4) {
         return sendError(
           res,
           CONSTANT_LIST.STATUS_ERROR,
@@ -119,33 +120,70 @@ export const listAllCard = asyncHandler(
       const sortOrder = req.body.sortOrder === "asc" ? 1 : -1;
       const search = req.body.search;
 
-      // const searchFilter = search
-      //   ? {
-      //       name: { $regex: search, $options: "i" },
-      //     }
-      //   : {};
       const userDetail = await User.findById(req.user?.userId);
+
+      // Build match stage
+      const searchFilter = search
+        ? { name: { $regex: search, $options: "i" } }
+        : {};
+
       const matchStage = {
         ...(userDetail?.role === "admin" ? {} : { userId: req.user?.userId }),
         isDeleted: false,
+        ...searchFilter,
       };
-      const cardProviderDetail = await CardProvider.aggregate([
+
+      // Aggregation pipeline
+      const cardProviderDetail = await Card.aggregate([
+        { $match: matchStage },
         {
-          $match: matchStage,
-        },
-        {
-          $sort: {
-            [sortBy]: sortOrder,
+          $lookup: {
+            from: "users",
+            localField: "userId",
+            foreignField: "_id",
+            as: "userDetail",
+            pipeline: [
+              {
+                $project: {
+                  userName: 1,
+                  firstName: 1,
+                  lastName: 1,
+                },
+              },
+            ],
           },
         },
         {
-          $limit: limit,
+          $lookup: {
+            from: "cardtypes",
+            foreignField: "_id",
+            localField: "cardTypeId",
+            as: "cardTypeDetail",
+          },
         },
         {
-          $skip: skip,
+          $lookup: {
+            from: "cardproviders",
+            foreignField: "_id",
+            localField: "cardProviderId",
+            as: "cardProviderDetail",
+          },
         },
+        {
+          $addFields: {
+            userDetail: { $first: "$userDetail" },
+            cardTypeDetail: { $first: "$cardTypeDetail" },
+            cardProviderDetail: { $first: "$cardProviderDetail" },
+          },
+        },
+        { $sort: { [sortBy]: sortOrder } },
+        { $skip: skip },
+        { $limit: limit },
       ]);
+
+      // Total count for pagination
       const totalCardProvider = await CardProvider.countDocuments(matchStage);
+
       if (cardProviderDetail.length === 0) {
         return sendError(
           res,
@@ -153,24 +191,23 @@ export const listAllCard = asyncHandler(
           CONSTANT_LIST.NO_DATA_FOUND,
           "No card provider found"
         );
-      } else {
-        const responsePayload = {
+      }
+
+      return sendSuccess(
+        res,
+        CONSTANT_LIST.STATUS_SUCCESS,
+        CONSTANT_LIST.STATUS_CODE_OK,
+        "Card details",
+        {
           cardProviderDetail,
           page,
           limit,
           total: totalCardProvider,
           totalPage: Math.ceil(totalCardProvider / limit),
-        };
-        return sendSuccess(
-          res,
-          CONSTANT_LIST.STATUS_SUCCESS,
-          CONSTANT_LIST.STATUS_CODE_OK,
-          "Card provider detail",
-          responsePayload
-        );
-      }
+        }
+      );
     } catch (err: any) {
-      console.log(err);
+      console.error("Error in listAllCard:", err);
       return sendError(
         res,
         CONSTANT_LIST.STATUS_ERROR,
