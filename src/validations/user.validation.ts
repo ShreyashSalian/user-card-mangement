@@ -15,7 +15,7 @@ export const userValidation = () => {
         options: trimInput,
       },
     },
-    fullName: {
+    lastName: {
       notEmpty: {
         errorMessage: "Please enter the lastname.",
       },
