@@ -1,0 +1,106 @@
+const userSchema = new mongoose.Schema({
+  userName: { type: String, required: true },
+  email: { type: String, required: true },
+  password: { type: String, required: true },
+
+  // 🔒 Login attempt tracking
+  failedLoginAttempts: { type: Number, default: 0 },
+  lockUntil: { type: Date, default: null },
+});
+
+// ✅ Check if account is currently locked
+userSchema.methods.isLocked = function (): boolean {
+  return !!(this.lockUntil && this.lockUntil > new Date());
+};
+
+
+export const login = asyncHandler(
+  async (
+    req: express.Request<{}, {}, LoginBody>,
+    res: express.Response
+  ): Promise<express.Response> => {
+    try {
+      const { userNameOrEmail, password } = req.body;
+      const MAX_ATTEMPTS = Number(process.env.MAX_LOGIN_ATTEMPTS) || 5;
+      const LOCK_TIME = (Number(process.env.LOCK_TIME_MINUTES) || 15) * 60 * 1000; // 15 min
+
+      const user = await User.findOne({
+        $or: [
+          { userName: userNameOrEmail },
+          { email: { $regex: userNameOrEmail, $options: "i" } },
+        ],
+      });
+
+      if (!user) {
+        return sendError(res, "error", 400, "Invalid username or password");
+      }
+
+      if (user.isDeleted) {
+        return sendError(res, "error", 403, "Your account has been disabled by admin");
+      }
+
+      // 🔒 Check if user is currently locked
+      if (user.isLocked()) {
+        const remainingSecs = Math.ceil((user.lockUntil!.getTime() - Date.now()) / 1000);
+        return sendError(
+          res,
+          "error",
+          403,
+          `Your account is locked. Try again in ${remainingSecs} seconds.`
+        );
+      }
+
+      // 🔑 Verify password
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        user.failedLoginAttempts += 1;
+
+        if (user.failedLoginAttempts >= MAX_ATTEMPTS) {
+          user.lockUntil = new Date(Date.now() + LOCK_TIME);
+          user.failedLoginAttempts = 0; // reset attempts after locking
+          await user.save();
+          return sendError(
+            res,
+            "error",
+            403,
+            `Account locked due to multiple failed attempts. Please try again later.`
+          );
+        }
+
+        await user.save();
+        return sendError(res, "error", 401, "Invalid username or password");
+      }
+
+      // ✅ Successful login — reset counters
+      user.failedLoginAttempts = 0;
+      user.lockUntil = null;
+      await user.save();
+
+      const accessToken = user.generateAccessToken();
+      const refreshToken = user.generateRefreshToken();
+
+      await Login.create({
+        userId: user._id,
+        email: user.email,
+        accessToken,
+        refreshToken,
+      });
+
+      const loginUser = await User.findById(user._id).select("-password");
+
+      return sendSuccess(res, "success", 200, "Login successful", {
+        loginUser,
+        accessToken,
+        refreshToken,
+      });
+    } catch (err) {
+      console.error("Login error:", err);
+      return sendError(res, "error", 500, "Internal server error");
+    }
+  }
+);
+
+.env
+
+MAX_LOGIN_ATTEMPTS=5
+LOCK_TIME_MINUTES=15
