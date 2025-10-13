@@ -104,3 +104,71 @@ export const login = asyncHandler(
 
 MAX_LOGIN_ATTEMPTS=5
 LOCK_TIME_MINUTES=15
+
+
+//-------middleware------
+// middleware/logger.js
+import fs from "fs";
+import path from "path";
+
+// Create a log file path
+const logFilePath = path.join(process.cwd(), "api_hits.txt");
+
+// Simple Express middleware
+export const apiLogger = (req, res, next) => {
+  const logEntry = `[${new Date().toISOString()}] ${req.method} ${req.originalUrl} from ${req.ip}\n`;
+
+  // Append to the file asynchronously
+  fs.appendFile(logFilePath, logEntry, (err) => {
+    if (err) console.error("Error writing to log file:", err);
+  });
+
+  next();
+};
+
+
+//-----------
+import { RateLimiterMemory } from "rate-limiter-flexible";
+import express from "express";
+import { asyncHandler, sendError } from "../utils/function";
+import { CONSTANT_LIST } from "../constants/global.constants";
+
+// Limit: 50 login attempts per minute per IP
+const maxAttemptsPerMinutes = 50;
+
+export const loginRateLimiter = new RateLimiterMemory({
+  points: maxAttemptsPerMinutes,
+  duration: 60, // 1 minute
+  blockDuration: 60 * 15, // 15 minutes block
+});
+
+export const rateLimiterMiddleware = asyncHandler(
+  async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    try {
+      const ip = req.ip;
+      if (!ip) {
+        return sendError(res, CONSTANT_LIST.STATUS_ERROR, 401, "No IP found");
+      }
+
+      await loginRateLimiter.consume(ip);
+      next();
+    } catch (err: any) {
+      if (err.consumedPoints && err.consumedPoints > maxAttemptsPerMinutes) {
+        return sendError(
+          res,
+          CONSTANT_LIST.STATUS_ERROR,
+          429,
+          "Too many login attempts. Try again later."
+        );
+      }
+
+      console.error(err);
+      return sendError(
+        res,
+        CONSTANT_LIST.STATUS_ERROR,
+        CONSTANT_LIST.INTERNAL_SERVER_ERROR,
+        CONSTANT_LIST.INTERNAL_SERVER_ERROR_MESSAGE
+      );
+    }
+  }
+);
